@@ -12,7 +12,7 @@ st.set_page_config(
 
 st.title("🚘 Predict Used Car Price for Batch Data")
 
-
+# Load Model
 model_url = "https://raw.githubusercontent.com/sh4fyhafidz/SHAFYHAFIDZ_ANALYSIS-SaaS-AWS_JCDS0508/main/Model_Saudi_Arabia_Used_Cars.sav"
 
 try:
@@ -23,10 +23,10 @@ try:
 except Exception as e:
     st.error(f"❌ Failed to load model: {str(e)}")
 
-
+# Required columns
 required_columns = ['Make', 'Type', 'Year', 'Color', 'Options', 'Engine_Size', 'Fuel_Type', 'Gear_Type', 'Mileage', 'Region']
 
-
+# File uploader
 uploaded_file = st.sidebar.file_uploader(
     label="Upload your file",
     type=["csv"],
@@ -40,24 +40,29 @@ if uploaded_file is not None:
     try:
         data = pd.read_csv(uploaded_file, index_col=None)
         
+        # Keep only required columns
         data = data[required_columns] if all(col in data.columns for col in required_columns) else data.filter(items=required_columns)
         
+        # Add new column for row identification
         data.insert(0, 'Car_ID', [f"MB-{str(i+1).zfill(2)}" for i in range(len(data))])
         
         st.dataframe(data, height=125)
         st.success(f"Dataset processed with required columns. Total rows: {data.shape[0]}")
         
+        # Convert index to list for Streamlit selection
+        default_selection = data.index[:50].tolist() if data.shape[0] > 50 else data.index.tolist()
+        
         # Select specific 50 rows from full dataset
         selected_rows = st.multiselect(
             "Select up to 50 rows to predict:", 
             options=data.index.tolist(), 
-            default=data.index[:50] if data.shape[0] > 50 else data.index.tolist()
+            default=default_selection
         )
         
         # If no selection is made, default to first 50 rows
-        if len(selected_rows) == 0:
+        if not selected_rows:
             st.warning("⚠️ No rows selected. Defaulting to the first 50 rows.")
-            selected_rows = data.index[:50].tolist()
+            selected_rows = default_selection
         
         if len(selected_rows) > 50:
             st.warning("⚠️ You can only select up to 50 rows.")

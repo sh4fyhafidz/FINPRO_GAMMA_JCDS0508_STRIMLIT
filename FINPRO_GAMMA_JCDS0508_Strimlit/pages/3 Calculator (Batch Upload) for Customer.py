@@ -12,7 +12,7 @@ st.set_page_config(
 
 st.title("🚘 Predict Used Car Price for Batch Data")
 
-# Load Model
+
 model_url = "https://raw.githubusercontent.com/sh4fyhafidz/SHAFYHAFIDZ_ANALYSIS-SaaS-AWS_JCDS0508/main/Model_Saudi_Arabia_Used_Cars.sav"
 
 try:
@@ -23,10 +23,10 @@ try:
 except Exception as e:
     st.error(f"❌ Failed to load model: {str(e)}")
 
-# Required columns
+
 required_columns = ['Make', 'Type', 'Year', 'Color', 'Options', 'Engine_Size', 'Fuel_Type', 'Gear_Type', 'Mileage', 'Region']
 
-# File uploader
+
 uploaded_file = st.sidebar.file_uploader(
     label="Upload your file",
     type=["csv"],
@@ -40,16 +40,13 @@ if uploaded_file is not None:
     try:
         data = pd.read_csv(uploaded_file, index_col=None)
         
-        # Keep only required columns
         data = data[required_columns] if all(col in data.columns for col in required_columns) else data.filter(items=required_columns)
         
-        # Add new column for row identification
         data.insert(0, 'Car_ID', [f"MB-{str(i+1).zfill(2)}" for i in range(len(data))])
         
         st.dataframe(data, height=125)
         st.success(f"Dataset processed with required columns. Total rows: {data.shape[0]}")
         
-        # Limit data to first 50 rows if necessary
         if data.shape[0] > 50:
             st.warning("⚠️ The uploaded file contains more than 50 rows. Only the first 50 rows will be processed.")
             data = data.iloc[:50]
@@ -59,7 +56,7 @@ if uploaded_file is not None:
             data['Prediction'] = predictions.round().astype(int)
             
             st.write("Prediction Result:")
-            st.dataframe(data[['Car_ID', 'Prediction']])
+            st.dataframe(data)
             
             csv = data.to_csv(index=False)
             st.download_button(

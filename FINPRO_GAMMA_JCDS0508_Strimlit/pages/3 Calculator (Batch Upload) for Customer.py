@@ -47,24 +47,37 @@ if uploaded_file is not None:
         st.dataframe(data, height=125)
         st.success(f"Dataset processed with required columns. Total rows: {data.shape[0]}")
         
-        if data.shape[0] > 50:
-            st.warning("⚠️ The uploaded file contains more than 50 rows. Only the first 50 rows will be processed.")
-            data = data.iloc[:50]
+        # Select specific 50 rows from full dataset
+        selected_rows = st.multiselect(
+            "Select up to 50 rows to predict:", 
+            options=data.index.tolist(), 
+            default=data.index[:50] if data.shape[0] > 50 else data.index.tolist()
+        )
         
-        if st.button("Predict the Price"):
-            predictions = model.predict(data[required_columns])
-            data['Prediction'] = predictions.round().astype(int)
-            
-            st.write("Prediction Result:")
-            st.dataframe(data)
-            
-            csv = data.to_csv(index=False)
-            st.download_button(
-                label="Download Prediction Result",
-                data=csv,
-                file_name='predictions.csv',
-                mime='text/csv'
-            )
+        # If no selection is made, default to first 50 rows
+        if len(selected_rows) == 0:
+            st.warning("⚠️ No rows selected. Defaulting to the first 50 rows.")
+            selected_rows = data.index[:50].tolist()
+        
+        if len(selected_rows) > 50:
+            st.warning("⚠️ You can only select up to 50 rows.")
+        else:
+            selected_data = data.loc[selected_rows]
+        
+            if st.button("Predict the Price"):
+                predictions = model.predict(selected_data[required_columns])
+                selected_data['Prediction'] = predictions.round().astype(int)
+                
+                st.write("Prediction Result:")
+                st.dataframe(selected_data)
+                
+                csv = selected_data.to_csv(index=False)
+                st.download_button(
+                    label="Download Prediction Result",
+                    data=csv,
+                    file_name='predictions.csv',
+                    mime='text/csv'
+                )
     except Exception as e:
         st.error(f"An error occurred while processing the file: {e}")
 else:

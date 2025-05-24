@@ -84,3 +84,5 @@ if not df_customer.empty:
     st.markdown(f"<p style='text-align: center;'>Commission (5%): SAR {price_commission}</p>", unsafe_allow_html=True)
     st.markdown(f"<p style='text-align: center;'>Monthly Installment (47 months): SAR {monthly_installment}</p>", unsafe_allow_html=True)
     st.markdown("---")
+
+st.write("### Fill the Detail")

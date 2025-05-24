@@ -5,12 +5,12 @@ import requests
 import io
 
 st.set_page_config(
-    page_title="Used Cars SA Batch Price Prediction",
-    page_icon="🚗",
+    page_title="Telco Customer Churn Prediction",
+    page_icon="📱",
     layout="wide"
 )
 
-st.title("🚘 Predict Used Car Price for Batch Data")
+st.title("📱 Telco Customer Churn Prediction (Batch)")
 
 # Load Model
 model_url = "https://raw.githubusercontent.com/sh4fyhafidz/SHAFYHAFIDZ_ANALYSIS-SaaS-AWS_JCDS0508/main/Model_Saudi_Arabia_Used_Cars.sav"
@@ -23,67 +23,71 @@ try:
 except Exception as e:
     st.error(f"❌ Failed to load model: {str(e)}")
 
-# Required columns
-required_columns = ['Make', 'Type', 'Year', 'Color', 'Options', 'Engine_Size', 'Fuel_Type', 'Gear_Type', 'Mileage', 'Region']
-
-# File uploader
-uploaded_file = st.sidebar.file_uploader(
-    label="Upload your file",
-    type=["csv"],
-    help="Upload file format .csv only."
-)
+# Upload file
+uploaded_file = st.sidebar.file_uploader("📤 Upload file CSV", type=["csv"])
+min_tenure = st.sidebar.number_input("🔢 Minimal Tenure (bulan):", min_value=0, value=10)
 
 if uploaded_file is not None:
-    st.sidebar.success(f"File '{uploaded_file.name}' successfully uploaded!")
-    st.write("Here is a preview of your data:")
-
     try:
-        data = pd.read_csv(uploaded_file, index_col=None)
-        
-        # Keep only required columns
-        data = data[required_columns] if all(col in data.columns for col in required_columns) else data.filter(items=required_columns)
-        
-        # Add new column for row identification
-        data.insert(0, 'Car_ID', [f"MB-{str(i+1).zfill(2)}" for i in range(len(data))])
-        
-        st.dataframe(data, height=125)
-        st.success(f"Dataset processed with required columns. Total rows: {data.shape[0]}")
-        
-        # Convert index to list for Streamlit selection
-        default_selection = data.index[:50].tolist() if data.shape[0] > 50 else data.index.tolist()
-        
-        # Select specific 50 rows from full dataset
-        selected_rows = st.multiselect(
-            "Select up to 50 rows to predict:", 
-            options=data.index.tolist(), 
-            default=default_selection
-        )
-        
-        # If no selection is made, default to first 50 rows
-        if not selected_rows:
-            st.warning("⚠️ No rows selected. Defaulting to the first 50 rows.")
-            selected_rows = default_selection
-        
-        if len(selected_rows) > 50:
-            st.warning("⚠️ You can only select up to 50 rows.")
+        data = pd.read_csv(uploaded_file)
+
+        # Simpan Churn asli jika ada
+        true_churn = data['Churn'] if 'Churn' in data.columns else None
+
+        # Tampilkan preview awal
+        st.write("📊 Data Upload Preview:")
+        st.dataframe(data.head())
+
+        # Filter berdasarkan tenure
+        filtered_data = data[data['tenure'] >= min_tenure].copy()
+        st.write(f"📋 {filtered_data.shape[0]} data dengan tenure ≥ {min_tenure} ditemukan.")
+
+        # Simpan Churn asli untuk data terfilter (jika ada)
+        if true_churn is not None:
+            churn_actual = true_churn.loc[filtered_data.index].values
         else:
-            selected_data = data.loc[selected_rows]
-        
-            if st.button("Predict the Price"):
-                predictions = model.predict(selected_data[required_columns])
-                selected_data['Prediction'] = predictions.round().astype(int)
-                
-                st.write("Prediction Result:")
-                st.dataframe(selected_data)
-                
-                csv = selected_data.to_csv(index=False)
+            churn_actual = None
+
+        # Hapus kolom target sebelum prediksi
+        if 'Churn' in filtered_data.columns:
+            filtered_data = filtered_data.drop(columns=['Churn'])
+
+        if st.button("🔮 Prediksi Churn"):
+            if model:
+                pred = model.predict(filtered_data)
+                proba = model.predict_proba(filtered_data)[:, 1]
+
+                # Tambahkan hasil prediksi
+                filtered_data['Churn_Predicted'] = pred
+                filtered_data['Proba_Churn'] = (proba * 100).round(2).astype(str) + '%'
+                filtered_data['Proba_Numeric'] = proba  # untuk pengurutan
+
+                # Urutkan berdasarkan probabilitas tertinggi
+                filtered_data = filtered_data.sort_values(by='Proba_Numeric', ascending=False)
+
+                # Tambahkan kolom actual jika tersedia
+                if churn_actual is not None:
+                    filtered_data['Churn_Actual'] = churn_actual
+
+                # Kolom yang ingin ditampilkan
+                display_cols = ['customerID', 'tenure', 'Churn_Predicted', 'Proba_Churn']
+                if churn_actual is not None:
+                    display_cols.append('Churn_Actual')
+
+                st.success("✅ Prediksi berhasil dilakukan!")
+                st.dataframe(filtered_data[display_cols])
+
+                # Download CSV (tanpa kolom numeric)
+                csv = filtered_data.drop(columns=['Proba_Numeric']).to_csv(index=False)
                 st.download_button(
-                    label="Download Prediction Result",
+                    label="📥 Download Hasil Prediksi",
                     data=csv,
-                    file_name='predictions.csv',
-                    mime='text/csv'
+                    file_name="hasil_prediksi_churn.csv",
+                    mime="text/csv"
                 )
+            else:
+                st.warning("⚠️ Model belum dimuat.")
     except Exception as e:
-        st.error(f"An error occurred while processing the file: {e}")
+        st.error(f"❌ Error saat membaca atau memproses data: {e}")
 else:
-    st.info("👈 Please upload your file first to start.")
+    st.info("👈 Upload file CSV kamu untuk memulai prediksi.")

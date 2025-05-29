@@ -114,17 +114,26 @@ if uploaded_file is not None:
                     pred = model.predict(filtered_data)
                     proba = model.predict_proba(filtered_data)[:, 1]
 
-                    results = filtered_data.copy()
+                    # Gabungkan kembali CustomerID jika tersedia
+                    if 'CustomerID' in data.columns:
+                        results = data.loc[filtered_data.index, ['CustomerID']].reset_index(drop=True)
+                        results = pd.concat([results, filtered_data.reset_index(drop=True)], axis=1)
+                    else:
+                        results = filtered_data.copy()
+
                     results['Churn_Predicted'] = pred
                     results['Proba_Churn'] = (proba * 100).round(2)
                     results['Churn_Risk'] = pd.cut(results['Proba_Churn'],
                                                   bins=[0, 30, 70, 100],
                                                   labels=['Low', 'Medium', 'High'])
 
+                    # Urutkan dari proba churn tertinggi
+                    results = results.sort_values(by='Proba_Churn', ascending=False)
+
                     st.success("✅ Prediksi batch berhasil dilakukan!")
 
-                    display_cols = ['Churn_Predicted', 'Proba_Churn', 'Churn_Risk'] + \
-                                   [col for col in results.columns if col not in ['Churn_Predicted', 'Proba_Churn', 'Churn_Risk']]
+                    display_cols = ['CustomerID', 'Churn_Predicted', 'Proba_Churn', 'Churn_Risk'] + \
+                                   [col for col in results.columns if col not in ['CustomerID', 'Churn_Predicted', 'Proba_Churn', 'Churn_Risk']]
 
                     st.dataframe(results[display_cols])
 
@@ -150,6 +159,7 @@ st.sidebar.markdown("---")
 st.sidebar.subheader("Input Manual Pelanggan")
 
 def user_input_features():
+    customer_id = st.sidebar.text_input("CustomerID", "0001-A")
     gender = st.sidebar.selectbox("Gender", ["Male", "Female"])
     senior = st.sidebar.selectbox("SeniorCitizen", ["No", "Yes"])
     partner = st.sidebar.selectbox("Partner", ["No", "Yes"])
@@ -172,6 +182,7 @@ def user_input_features():
     total_charges = st.sidebar.number_input("TotalCharges", min_value=0.0, value=1000.0, step=0.1)
 
     data = {
+        'CustomerID': customer_id,
         'Gender': gender,
         'SeniorCitizen': senior,
         'Partner': partner,
@@ -201,8 +212,13 @@ if st.sidebar.button("🔮 Prediksi Churn Manual"):
     if model is not None:
         try:
             manual_cleaned = clean_and_validate_data(manual_df)
-            pred = model.predict(manual_cleaned)
-            proba = model.predict_proba(manual_cleaned)[:, 1]
+
+            # Tambahkan kembali CustomerID jika ada
+            if 'CustomerID' in manual_df.columns:
+                manual_cleaned.insert(0, 'CustomerID', manual_df['CustomerID'].values)
+
+            pred = model.predict(manual_cleaned.drop(columns=['CustomerID']))
+            proba = model.predict_proba(manual_cleaned.drop(columns=['CustomerID']))[:, 1]
 
             manual_cleaned['Churn_Predicted'] = pred
             manual_cleaned['Proba_Churn'] = (proba * 100).round(2)
@@ -210,9 +226,11 @@ if st.sidebar.button("🔮 Prediksi Churn Manual"):
                                                  bins=[0, 30, 70, 100],
                                                  labels=['Low', 'Medium', 'High'])
 
+            manual_cleaned = manual_cleaned.sort_values(by='Proba_Churn', ascending=False)
+
             st.success("✅ Prediksi manual berhasil!")
-            display_cols = ['Churn_Predicted', 'Proba_Churn', 'Churn_Risk'] + \
-                           [col for col in manual_cleaned.columns if col not in ['Churn_Predicted', 'Proba_Churn', 'Churn_Risk']]
+            display_cols = ['CustomerID', 'Churn_Predicted', 'Proba_Churn', 'Churn_Risk'] + \
+                           [col for col in manual_cleaned.columns if col not in ['CustomerID', 'Churn_Predicted', 'Proba_Churn', 'Churn_Risk']]
 
             st.dataframe(manual_cleaned[display_cols])
 
